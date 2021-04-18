@@ -20,9 +20,10 @@ class VibrationPulseTest:
         printer = config.get_printer()
         self.gcode = printer.lookup_object('gcode')
         self.min_freq = config.getfloat('min_freq', 5., minval=1.)
-        self.max_freq = config.getfloat('max_freq', 120.,
+        # Defaults are such that max_freq * accel_per_hz == 10000 (max_accel)
+        self.max_freq = config.getfloat('max_freq', 10000. / 75.,
                                         minval=self.min_freq, maxval=200.)
-        self.accel_per_hz = config.getfloat('accel_per_hz', 75.0, above=0.)
+        self.accel_per_hz = config.getfloat('accel_per_hz', 75., above=0.)
         self.hz_per_sec = config.getfloat('hz_per_sec', 1.,
                                           minval=0.1, maxval=2.)
 
@@ -82,6 +83,7 @@ class ResonanceTester:
                 ('y', config.get('accel_chip_y').strip())]
             if self.accel_chip_names[0][1] == self.accel_chip_names[1][1]:
                 self.accel_chip_names = [('xy', self.accel_chip_names[0][1])]
+        self.max_smoothing = config.getfloat('max_smoothing', None, minval=0.05)
 
         self.gcode = self.printer.lookup_object('gcode')
         self.gcode.register_command("MEASURE_AXES_NOISE",
@@ -126,6 +128,13 @@ class ResonanceTester:
         if csv_output:
             helper = shaper_calibrate.ShaperCalibrate(self.printer)
 
+        input_shaper = self.printer.lookup_object('input_shaper', None)
+        if input_shaper is not None and not gcmd.get_int('INPUT_SHAPING', 0):
+            input_shaper.disable_shaping()
+            gcmd.respond_info("Disabled [input_shaper] for resonance testing")
+        else:
+            input_shaper = None
+
         currentPos = toolhead.get_position()
         Z = currentPos[2]
         E = currentPos[3]
@@ -169,12 +178,19 @@ class ResonanceTester:
                             "%s-axis accelerometer measured no data" % (
                                 chip_axis,))
                 new_data = helper.process_accelerometer_data(chip_values)
-                data = data.join(new_data) if data else new_data
+                if data is None:
+                    data = new_data
+                else:
+                    data.add_data(new_data)
         if csv_output:
             csv_name = self.save_calibration_data('resonances', name_suffix,
                                                   helper, axis, data)
             gcmd.respond_info(
                     "Resonances data written to %s file" % (csv_name,))
+        if input_shaper is not None:
+            input_shaper.enable_shaping()
+            gcmd.respond_info(
+                    "Re-enabled [input_shaper] after resonance testing")
 
     def cmd_SHAPER_CALIBRATE(self, gcmd):
         toolhead = self.printer.lookup_object('toolhead')
@@ -187,6 +203,9 @@ class ResonanceTester:
             raise gcmd.error("Unsupported axis '%s'" % (axis,))
         else:
             calibrate_axes = [axis.lower()]
+
+        max_smoothing = gcmd.get_float(
+                "MAX_SMOOTHING", self.max_smoothing, minval=0.05)
 
         name_suffix = gcmd.get("NAME", time.strftime("%Y%m%d_%H%M%S"))
         if not self.is_valid_name_suffix(name_suffix):
@@ -235,7 +254,7 @@ class ResonanceTester:
                     if calibration_data[axis] is None:
                         calibration_data[axis] = new_data
                     else:
-                        calibration_data[axis].join(new_data)
+                        calibration_data[axis].add_data(new_data)
 
         configfile = self.printer.lookup_object('configfile')
 
@@ -244,15 +263,16 @@ class ResonanceTester:
                     "Calculating the best input shaper parameters for %s axis"
                     % (axis,))
             calibration_data[axis].normalize_to_frequencies()
-            shaper_name, shaper_freq, shapers_vals = helper.find_best_shaper(
-                    calibration_data[axis], gcmd.respond_info)
+            best_shaper, all_shapers = helper.find_best_shaper(
+                    calibration_data[axis], max_smoothing, gcmd.respond_info)
             gcmd.respond_info(
                     "Recommended shaper_type_%s = %s, shaper_freq_%s = %.1f Hz"
-                    % (axis, shaper_name, axis, shaper_freq))
-            helper.save_params(configfile, axis, shaper_name, shaper_freq)
+                    % (axis, best_shaper.name, axis, best_shaper.freq))
+            helper.save_params(configfile, axis,
+                               best_shaper.name, best_shaper.freq)
             csv_name = self.save_calibration_data(
                     'calibration_data', name_suffix, helper, axis,
-                    calibration_data[axis], shapers_vals)
+                    calibration_data[axis], all_shapers)
             gcmd.respond_info(
                     "Shaper calibration data written to %s file" % (csv_name,))
 
@@ -293,10 +313,10 @@ class ResonanceTester:
         return os.path.join("/tmp", name + ".csv")
 
     def save_calibration_data(self, base_name, name_suffix, shaper_calibrate,
-                              axis, calibration_data, shapers_vals=None):
+                              axis, calibration_data, all_shapers=None):
         output = self.get_filename(base_name, name_suffix, axis)
         shaper_calibrate.save_calibration_data(output, calibration_data,
-                                               shapers_vals)
+                                               all_shapers)
         return output
 
 def load_config(config):
