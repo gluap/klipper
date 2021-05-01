@@ -12,6 +12,25 @@
 #include "pyhelper.h" // errorf
 #include "trapq.h" // move_get_distance
 
+
+// simple linear interpolation function to interpolate between measured values
+double
+inter (double x[], double y[], int size, double v)
+{
+  if (v < x[0])
+    return y[0];
+  if (v > x[size - 1])
+    return y[size - 1];
+  for (int i = 0; i < size - 1; i++)
+    {
+      if (x[i+1]> v >= x[i]) 
+	{
+	  return ((v - x[i]) / (x[i + 1] - x[i]) * y[i + 1]) +
+	    ((1. - (v - x[i]) / (x[i + 1] - x[i])) * y[i]);
+	}
+    }
+}
+
 // Without pressure advance, the extruder stepper position is:
 //     extruder_position(t) = nominal_position(t)
 // When pressure advance is enabled, additional filament is pushed
