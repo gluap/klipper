@@ -17,9 +17,11 @@
 double
 inter (double x[], double y[], int size, double v)
 {
-  if (v < x[0])
+  if (size == 0)
+    return v;
+  if (unlikely(v < x[0]))
     return y[0];
-  if (v > x[size - 1])
+  if (unlikely(v > x[size - 1]))
     return y[size - 1];
   for (int i = 0; i < size - 1; i++)
     {
@@ -119,6 +121,7 @@ pa_range_integrate(struct move *m, double move_time, double hst)
 struct extruder_stepper {
     struct stepper_kinematics sk;
     double half_smooth_time, inv_half_smooth_time2;
+    double inter_x[100], inter_y[100], inter_size;
 };
 
 static double
@@ -145,6 +148,18 @@ extruder_set_smooth_time(struct stepper_kinematics *sk, double smooth_time)
     if (! hst)
         return;
     es->inv_half_smooth_time2 = 1. / (hst * hst);
+}
+
+void __visible
+extruder_set_feedrate_adaption_interpolation(inter (double x[], double y[], int size)
+{
+    struct extruder_stepper *es = container_of(sk, struct extruder_stepper, sk);
+    es->inter_size = size;
+    for (int i=0; i<size; i++) {
+       es->inter_x[i] = x[i];
+       es->inter_y[i] = y[i];
+    }
+
 }
 
 struct stepper_kinematics * __visible
