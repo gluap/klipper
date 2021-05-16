@@ -25,12 +25,13 @@ inter (double x[], double y[], int size, double v)
         return y[size - 1];
     for (int i = 0; i < size - 1; i++)
     {
-        if (x[i+1]> v >= x[i])
+        if ((x[i+1]> v) && (v >= x[i]))
         {
             return ((v - x[i]) / (x[i + 1] - x[i]) * y[i + 1]) +
                 ((1. - (v - x[i]) / (x[i + 1] - x[i])) * y[i]);
         }
     }
+    return v;
 }
 
 // Without pressure advance, the extruder stepper position is:
@@ -151,7 +152,8 @@ extruder_set_smooth_time(struct stepper_kinematics *sk, double smooth_time)
 }
 
 void __visible
-extruder_set_feedrate_adaption_interpolation(struct stepper_kinematics *sk, double x[], double y[],
+extruder_set_feedrate_adaption_interpolation(struct stepper_kinematics *sk,
+                                             double x[], double y[],
                                              int size)
 {
     struct extruder_stepper *es = container_of(sk, struct extruder_stepper, sk);

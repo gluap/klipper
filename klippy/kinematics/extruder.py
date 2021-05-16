@@ -64,7 +64,9 @@ class PrinterExtruder:
         self.extruder_set_feedrate_adaption_interpolation\
             = ffi_lib.extruder_set_feedrate_adaption_interpolation
         self._set_pressure_advance(pressure_advance, smooth_time)
-        self.extruder_set_feedrate_adaption_interpolation(self.adaption_feedrates,
+        self.extruder_set_feedrate_adaption_interpolation(
+                                                  self.sk_extruder,
+                                                  self.adaption_feedrates,
                                                   self.adaption_extrusions,
                                                   self.adaption_length)
         # Register commands
