@@ -18,7 +18,7 @@ double
 inter (double x[], double y[], int size, double v)
 {
     if (size == 0)
-        return v;
+        return 1;
     if (unlikely(v < x[0]))
         return y[0];
     if (unlikely(v > x[size - 1]))
@@ -131,12 +131,17 @@ extruder_calc_position(struct stepper_kinematics *sk, struct move *m
 {
     struct extruder_stepper *es = container_of(sk, struct extruder_stepper, sk);
     double hst = es->half_smooth_time;
-    if (!hst)
+    if (!hst){
         // Pressure advance not enabled
-        return m->start_pos.x + move_get_distance(m, move_time);
+        return m->start_pos.x + move_get_distance(m, move_time) *
+               inter(es->inter_x, es->inter_y, es->inter_size,
+               m->start_v + m->half_accel * move_time);
+    }
     // Apply pressure advance and average over smooth_time
     double area = pa_range_integrate(m, move_time, hst);
-    return m->start_pos.x + area * es->inv_half_smooth_time2;
+    return m->start_pos.x + area * es->inv_half_smooth_time2 *
+       inter(es->inter_x, es->inter_y, es->inter_size,
+             m->start_v + m->half_accel * move_time);
 }
 
 void __visible
