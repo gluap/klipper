@@ -17,19 +17,19 @@
 double
 inter (double x[], double y[], int size, double v)
 {
-  if (size == 0)
-    return v;
-  if (unlikely(v < x[0]))
-    return y[0];
-  if (unlikely(v > x[size - 1]))
-    return y[size - 1];
-  for (int i = 0; i < size - 1; i++)
+    if (size == 0)
+        return v;
+    if (unlikely(v < x[0]))
+        return y[0];
+    if (unlikely(v > x[size - 1]))
+        return y[size - 1];
+    for (int i = 0; i < size - 1; i++)
     {
-      if (x[i+1]> v >= x[i]) 
-	{
-	  return ((v - x[i]) / (x[i + 1] - x[i]) * y[i + 1]) +
-	    ((1. - (v - x[i]) / (x[i + 1] - x[i])) * y[i]);
-	}
+        if (x[i+1]> v >= x[i])
+        {
+            return ((v - x[i]) / (x[i + 1] - x[i]) * y[i + 1]) +
+                ((1. - (v - x[i]) / (x[i + 1] - x[i])) * y[i]);
+        }
     }
 }
 
@@ -151,7 +151,8 @@ extruder_set_smooth_time(struct stepper_kinematics *sk, double smooth_time)
 }
 
 void __visible
-extruder_set_feedrate_adaption_interpolation(inter (double x[], double y[], int size)
+extruder_set_feedrate_adaption_interpolation(inter (double x[], double y[],
+                                             int size)
 {
     struct extruder_stepper *es = container_of(sk, struct extruder_stepper, sk);
     es->inter_size = size;
