@@ -151,7 +151,7 @@ extruder_set_smooth_time(struct stepper_kinematics *sk, double smooth_time)
 }
 
 void __visible
-extruder_set_feedrate_adaption_interpolation(inter (double x[], double y[],
+extruder_set_feedrate_adaption_interpolation(struct stepper_kinematics *sk, double x[], double y[],
                                              int size)
 {
     struct extruder_stepper *es = container_of(sk, struct extruder_stepper, sk);
@@ -160,7 +160,6 @@ extruder_set_feedrate_adaption_interpolation(inter (double x[], double y[],
        es->inter_x[i] = x[i];
        es->inter_y[i] = y[i];
     }
-
 }
 
 struct stepper_kinematics * __visible

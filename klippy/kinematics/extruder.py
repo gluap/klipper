@@ -3,8 +3,12 @@
 # Copyright (C) 2016-2019  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import math, logging
-import stepper, chelper
+import logging
+import math
+
+import chelper
+import stepper
+
 
 class PrinterExtruder:
     def __init__(self, config, extruder_num):
@@ -44,6 +48,8 @@ class PrinterExtruder:
         pressure_advance = config.getfloat('pressure_advance', 0., minval=0.)
         smooth_time = config.getfloat('pressure_advance_smooth_time',
                                       0.040, above=0., maxval=.200)
+        self.adaption_feedrates, self.adaption_extrusions, self.adaption_length\
+            = self._read_feedrate_adaption_from_config(config)
         # Setup iterative solver
         ffi_main, ffi_lib = chelper.get_ffi()
         self.trapq = ffi_main.gc(ffi_lib.trapq_alloc(), ffi_lib.trapq_free)
@@ -55,7 +61,12 @@ class PrinterExtruder:
         self.stepper.set_trapq(self.trapq)
         toolhead.register_step_generator(self.stepper.generate_steps)
         self.extruder_set_smooth_time = ffi_lib.extruder_set_smooth_time
+        self.extruder_set_feedrate_adaption_interpolation\
+            = ffi_lib.extruder_set_feedrate_adaption_interpolation
         self._set_pressure_advance(pressure_advance, smooth_time)
+        self.extruder_set_feedrate_adaption_interpolation(self.adaption_feedrates,
+                                                  self.adaption_extrusions,
+                                                  self.adaption_length)
         # Register commands
         gcode = self.printer.lookup_object('gcode')
         if self.name == 'extruder':
@@ -76,6 +87,21 @@ class PrinterExtruder:
                                    desc=self.cmd_SET_E_STEP_DISTANCE_help)
     def update_move_time(self, flush_time):
         self.trapq_free_moves(self.trapq, flush_time)
+    def _read_feedrate_adaption_from_config(self, config):
+        feedrates_raw = config.get('feedrate_adaption_rates', default=None)
+        extrusions_raw = config.get('feedrate_adaption_extrusions',
+                                    default=None)
+        if (feedrates_raw is None) ^ (extrusions_raw is None):
+            raise config.error("both rates and extrusions need to be set for"
+                               "feedrate_adaption")
+        if (feedrates_raw is None) and (extrusions_raw is None):
+            return [], [], 0
+        feedrates = [float(i) for i in feedrates_raw.split()]
+        extrusions = [float(i) for i in extrusions_raw.split()]
+        if len(feedrates) != len(extrusions):
+            raise config.error("A measured extrusion value is required"
+                               "for each feedrate in feedrate_adaption config")
+        return feedrates, extrusions, len(feedrates)
     def _set_pressure_advance(self, pressure_advance, smooth_time):
         old_smooth_time = self.pressure_advance_smooth_time
         if not self.pressure_advance:

@@ -113,6 +113,8 @@ defs_kin_extruder = """
     struct stepper_kinematics *extruder_stepper_alloc(void);
     void extruder_set_smooth_time(struct stepper_kinematics *sk
         , double smooth_time);
+    void extruder_set_feedrate_adaption_interpolation(struct 
+         stepper_kinematics *sk, double x[], double y[], int size)
 """
 
 defs_kin_shaper = """
